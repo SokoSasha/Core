@@ -1,6 +1,7 @@
 __asm("jmp kmain");
 
 #define COLOUR_ADDRESS (0x3000)
+#define ERR_CLR (0x0c)
 #define VIDEO_BUF_PTR (0xb8000) 
 #define IDT_TYPE_INTR (0x0E)
 #define IDT_TYPE_TRAP (0x0F)
@@ -49,12 +50,13 @@ void solve(unsigned char* str);
 void lcm(unsigned char* str);
 void div(unsigned char* str);
 int char_to_int(unsigned char *str);
-char *int_to_char(int integer);
+unsigned char *int_to_char(int integer);
 void clean();
 void scroll();
 bool check_of(int num, char* str_num);
+bool check_of_sum(int num1, int num2);
+int nod(int m, int n);
 
-void shutdown();
 void shift_check(unsigned char scan_code);
 void clean(bool chk);
 void backspace();
@@ -172,7 +174,7 @@ void default_intr_handler()
 {
 	asm("pusha");
 	// ... (реализация обработки)
-	out_str(0x0c, "Wrong command", ++global_str);
+	out_str(ERR_CLR, "Wrong command", ++global_str);
 	asm("popa; leave; iret");
 }
 
@@ -383,19 +385,26 @@ void symbol(unsigned char scan_code)
 	}
 }
 
+unsigned char* lower(unsigned char* str){
+	for (int i = 0; i < strlen(str); i+=2)
+		for (int j = 0; j < 28 * 2; j++)
+			if (str[i] == shift_char[j]) str[i] = shift_char[j % 28];
+	return str;
+}
+
 
 void commands()
 {
 	unsigned char* video_buf = (unsigned char*) VIDEO_BUF_PTR;
 	video_buf += 2 * (global_str * VIDEO_WIDTH + 2);
 
-	if (strcmp(video_buf, "info")) info();
-	else if (strcmp(video_buf, "gcd ")) gcd(video_buf + 8);
-	else if (strcmp(video_buf, "solve ")) solve(video_buf + 12);
-	else if (strcmp(video_buf, "lcm ")) lcm(video_buf + 8);
-	else if (strcmp(video_buf, "div ")) div(video_buf + 8);
-	else if (strcmp(video_buf, "shutdown")) outw(0x604, 0x2000);
-	else out_str(0x0c, "Wrong command", ++global_str);
+	if (strcmp(lower(video_buf), "info")) info();
+	else if (strcmp(lower(video_buf), "gcd ")) gcd(video_buf + 8);
+	else if (strcmp(lower(video_buf), "solve ")) solve(video_buf + 12);
+	else if (strcmp(lower(video_buf), "lcm ")) lcm(video_buf + 8);
+	else if (strcmp(lower(video_buf), "div ")) div(video_buf + 8);
+	else if (strcmp(lower(video_buf), "shutdown")) outw(0x604, 0x2000);
+	else out_str(ERR_CLR, "Wrong command", ++global_str);
 }
 
 bool strcmp(unsigned char *str1, const char *str2)
@@ -463,16 +472,16 @@ int char_to_int(unsigned char *str){
 	return res;
 }
 
-char *int_to_char(int integer){
+unsigned char *int_to_char(int integer){
 	bool add = 1;
-	static char ch[20] = {'\0'};
+	unsigned char ch[20] = {'\0'};
 
 	if (integer < 0) {
 		integer = 0 - integer;
 		add = 0;
 	}
 
-	if (!integer) return "0";
+	if (!integer) return (unsigned char*)"0";
 
 	int i = 0;
 	int temp = integer;
@@ -491,8 +500,24 @@ char *int_to_char(int integer){
 	return ch;
 }
 
+bool strcmp_s(unsigned char* str1, unsigned char* str2){
+	if (*str1 == '+') str1++;
+	while (*str1 != '\0' && *str1 != ' ' && *str2 != '\0' && *str1 == *str2) 
+    {
+      str1++;
+      str2++;
+    }
+   if (*str1 == *str2) return 1; 
+   return 0;
+}
+
 bool check_of(int num, unsigned char* str_num){
-	return strcmp(str_num, int_to_char(num));
+	if (strcmp_s(str_num, int_to_char(num))){
+		out_word(ERR_CLR, "0");
+		return 0;
+	}
+	out_word(ERR_CLR, "1");
+	return 1;
 }
 
 bool check_of_sum(int num1, int num2){
@@ -531,43 +556,45 @@ void solve(unsigned char *str){
 	if (*num2 != '\0') dig2 = char_to_int(num2);
 	int dig3 = 0;
 	if (*num3 != '\0') dig3 = char_to_int(num3);
-	if (dig1 != 0 && (dig2 != 0 || dig3 != 0) && check_of(dig1, num1) && check_of(dig3, num3) && check_of(dig2, num2) && check_of_sum(dig3, -1 * dig2)){
+	bool ZD = (dig1 == 0);
+	bool WC = (dig2 == 0 && dig3 == 0);
+	bool OF = (check_of(dig1, num1) || check_of(dig3, num3) || check_of(dig2, num2) || check_of_sum(dig3, -1 * dig2));
+	if (!ZD && !WC && !OF){
 		int res = (dig3 - dig2) /dig1;
 		if (dig1 * res + dig2 != dig3){
 			float resfl = ((float)dig3 - (float)dig2) / (float)dig1;
-			const char *chr1 = int_to_char((int)resfl);
+			unsigned char *chr1 = int_to_char((int)resfl);
 			global_pos = 0;
 			global_str++;
 			out_word(currentColour, "Result: x = ");
 			if (resfl < 0 && resfl > -1) out_word(currentColour, "-");
-			out_word(currentColour, chr1);
+			out_word(currentColour, (const char*)chr1);
 			out_word(currentColour, ".");
 			resfl = (resfl - (int)resfl)*1000000;
 			if (resfl < 0) resfl = resfl*(-1);
 			if ((int)resfl % 10 >= 5) resfl = resfl + 10;
 			resfl = resfl / 10;
-			const char *chr2 = int_to_char((int)resfl);
+			unsigned char *chr2 = int_to_char((int)resfl);
 			for (int k = 5; k > strlen((unsigned char *)chr2); k--)
 				out_word(currentColour, "0");
-			out_word(currentColour, chr2);
+			out_word(currentColour, (const char*)chr2);
 		}
 		else {
-		const char *chr = int_to_char(res);
+		unsigned char *chr = int_to_char(res);
 		global_pos = 0;
 		global_str++;
 		out_word(currentColour, "Result: x = ");
-		out_word(currentColour, chr);
+		out_word(currentColour, (const char*)chr);
 		}
 	}
 	else {
-		if (dig2 == 0 && dig3 == 0) out_str(0x0c, "Wrong command", ++global_str);
-		if (dig1 == 0) out_str(0x0c, "Division by zero", ++global_str);
-		if (!check_of(dig1, num1) || !check_of(dig3, num3) || !check_of(dig2, num2) || !check_of_sum(dig3, -1 * dig2)) out_str(0x0c, "Overflow", ++global_str);
+		if (WC) out_str(ERR_CLR, "Wrong command", ++global_str);
+		if (ZD) out_str(ERR_CLR, "Division by zero", ++global_str);
+		if (OF) out_str(ERR_CLR, "Overflow", ++global_str);
 	}
 }
 
-int nod(int m, int n)
-{
+int nod(int m, int n){
     return n ? nod(n, m % n) : m;
 }
 
@@ -592,17 +619,19 @@ void gcd(unsigned char *str){
 	dig1 = char_to_int(gcd1);
 	int dig2 = 1;
 	dig2 = char_to_int(gcd2);
-	if (*gcd1 != '\0' && *gcd2 != '\0' && dig1 != 0 && dig2 != 0 && check_of(dig1, gcd1) && check_of(dig2, gcd2)){
+	bool WC = (*gcd1 == '\0' || *gcd2 == '\0' || dig1 == 0 || dig2 == 0);
+	bool OF = (check_of(dig1, gcd1) || check_of(dig2, gcd2));
+	if (!WC && !OF){
 		int gcd_res = nod(dig1, dig2);
-		const char *chr = int_to_char(gcd_res);
+		unsigned char *chr = int_to_char(gcd_res);
 		global_pos = 0;
 		global_str++;
 		out_word(currentColour, "Result: ");
-		out_word(currentColour, chr);
+		out_word(currentColour, (const char*)chr);
 	}
 	else {
-		if (*gcd1 == '\0' || *gcd2 == '\0' || dig1 == 0 || dig2 == 0) out_str(0x0c, "Wrong command", ++global_str);
-		if (!check_of(dig1, gcd1) || !check_of(dig2, gcd2)) out_str(0x0c, "Overflow", ++global_str);
+		if (WC) out_str(ERR_CLR, "Wrong command", ++global_str);
+		if (OF) out_str(ERR_CLR, "Overflow", ++global_str);
 	}
 }
 
@@ -627,18 +656,20 @@ void lcm(unsigned char *str){
 	dig1 = char_to_int(lcm1);
 	int dig2 = 1;
 	dig2 = char_to_int(lcm2);
-	if (*lcm1 != '\0' && *lcm2 != '\0' && dig1 != 0 && dig2 != 0 && check_of(dig1, lcm1) && check_of(dig2, lcm2)){
+	bool WC = (*lcm1 == '\0' || *lcm2 == '\0' || dig1 == 0 || dig2 == 0);
+	bool OF = (check_of(dig1,lcm1) || check_of(dig2, lcm2));
+	if (!WC && !OF){
 		
 		int lcm_res = (dig1 * dig2) / nod(dig1, dig2);
-		const char *chr = int_to_char(lcm_res);
+		unsigned char *chr = int_to_char(lcm_res);
 		global_pos = 0;
 		global_str++;
 		out_word(currentColour, "Result: ");
-		out_word(currentColour, chr);
+		out_word(currentColour, (const char*)chr);
 	}
 	else {
-		if  (*lcm1 == '\0' || *lcm2 == '\0' || dig1 == 0 || dig2 == 0) out_str(0x0c, "Wrong command", ++global_str);
-		if (!check_of(dig1,lcm1) || !check_of(dig2, lcm2)) out_str(0x0c, "Overflow", ++global_str);
+		if  (WC) out_str(ERR_CLR, "Wrong command", ++global_str);
+		if (OF) out_str(ERR_CLR, "Overflow", ++global_str);
 	}
 }
 
@@ -663,25 +694,28 @@ void div(unsigned char *str){
 	dig1 = char_to_int(div1);
 	int dig2 = 1;
 	dig2 = char_to_int(div2);
-	if (*div1 != '\0' && *div2 != '\0' && dig1 != 0 && check_of(dig1, div1) && check_of(dig2, div2)){
-	float div_resfl = (float)dig1 / (float)dig2;
-	const char *chr1 = int_to_char((int)div_resfl);
-	global_pos = 0;
-	global_str++;
-	out_word(currentColour, "Result: ");
-	out_word(currentColour, chr1);
-	out_word(currentColour, ".");
-	div_resfl = (div_resfl - (int)div_resfl)*1000000;
-	if ((int)div_resfl % 10 >= 5) div_resfl = div_resfl + 10;
-	div_resfl = div_resfl / 10;
-	const char *chr2 = int_to_char((int)div_resfl);
-	for (int k = 5; k > strlen((unsigned char *)chr2); k--)
-		out_word(currentColour, "0");
-		out_word(currentColour, chr2);
+	bool WC = (*div1 == '\0' || *div2 == '\0');
+	bool ZD = (dig2 == 0);
+	bool OF = (check_of(dig1, div1) || check_of(dig2, div2));
+	if (!WC && !ZD && !OF){
+		float div_resfl = (float)dig1 / (float)dig2;
+		unsigned char *chr1 = int_to_char((int)div_resfl);
+		global_pos = 0;
+		global_str++;
+		out_word(currentColour, "Result: ");
+		out_word(currentColour, (const char*)chr1);
+		out_word(currentColour, ".");
+		div_resfl = (div_resfl - (int)div_resfl)*1000000;
+		if ((int)div_resfl % 10 >= 5) div_resfl = div_resfl + 10;
+		div_resfl = div_resfl / 10;
+		unsigned char *chr2 = int_to_char((int)div_resfl);
+		for (int k = 5; k > strlen((unsigned char *)chr2); k--)
+			out_word(currentColour, "0");
+			out_word(currentColour, (const char*)chr2);
 	}
 	else {
-		if (*div1 == '\0' || *div2 == '\0') out_str(0x0c, "Wrong command", ++global_str);
-		if (dig1 == 0) out_str(0x0c, "Division by zero", ++global_str);
-		if (!check_of(dig1, div1) || !check_of(dig2, div2)) out_str(0x0c, "Overflow", ++global_str);
+		if (WC) out_str(ERR_CLR, "Wrong command", ++global_str);
+		if (ZD) out_str(ERR_CLR, "Division by zero", ++global_str);
+		if (OF) out_str(ERR_CLR, "Overflow", ++global_str);
 	}
 }
