@@ -1,5 +1,6 @@
 __asm("jmp kmain");
 
+#define COLOUR_ADDRESS (0x3000)
 #define VIDEO_BUF_PTR (0xb8000) 
 #define IDT_TYPE_INTR (0x0E)
 #define IDT_TYPE_TRAP (0x0F)
@@ -10,6 +11,8 @@ __asm("jmp kmain");
 #define VIDEO_WIDTH (80)
 #define VIDEO_LENGTH (25)
 
+#define MAX_INT (2147483647)
+#define MIN_INT (-2147483648)
 
 struct idt_entry
 {
@@ -34,12 +37,11 @@ struct idt_ptr g_idtp;
 unsigned int global_str = 0;
 unsigned int global_pos = 0;
 bool shift = false;
-bool start = true;
 
 void on_key(unsigned char scan_code);
-void command_handler();
+void commands();
 bool strcmp(unsigned char *str1, const char *str2);
-int strlen_s(unsigned char *str);
+int strlen(unsigned char *str);
 
 void info();
 void gcd(unsigned char* str);
@@ -48,7 +50,9 @@ void lcm(unsigned char* str);
 void div(unsigned char* str);
 int char_to_int(unsigned char *str);
 char *int_to_char(int integer);
+void clean();
 void scroll();
+bool check_of(int num, char* str_num);
 
 void shutdown();
 void shift_check(unsigned char scan_code);
@@ -65,18 +69,16 @@ void intr_start();
 void intr_enable();
 void intr_disable();
 void out_str(int color, const char* ptr, unsigned int strnum);
-
 void out_char(int color, unsigned char simbol);
 void out_word(int color, const char* ptr);
 void out_num(int num);
 static inline void outw (unsigned int port, unsigned int data);
-
 static inline unsigned char inb (unsigned short port);
 static inline void outb (unsigned short port, unsigned char data);
 void keyb_init();
 void keyb_handler();
 void keyb_process_keys();
-void cursor_moveto(unsigned int strnum, unsigned int pos);
+void cursor_move_to(unsigned int strnum, unsigned int pos);
 
 char scan_codes[] = 
 {
@@ -117,11 +119,10 @@ char shift_char[] =
 	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '+', '*'
 };
 
-char currentColour = 0x07;
-char colour = 0;
+char currentColour = 0x08;
 char colours[] = { 0x07, 0x0f, 0x0e, 0x0b, 0x09, 0x0a };
 
-void clean(bool chk)
+void clean()
 {	
 	unsigned char *video_buf = (unsigned char*) VIDEO_BUF_PTR;
 	for (int i = 0; i < VIDEO_WIDTH * VIDEO_LENGTH; i++){
@@ -129,11 +130,9 @@ void clean(bool chk)
 	}
 	global_str = 0;
 	global_pos = 0;
-	if(chk){
-		out_str(currentColour, "# ", global_str);
-		global_pos = 2;
-	}
-	cursor_moveto(global_str, global_pos);
+	out_str(currentColour, "# ", global_str);
+	global_pos = 2;
+	cursor_move_to(global_str, global_pos);
 }
 
 void scroll(unsigned int strnm){
@@ -147,35 +146,13 @@ void scroll(unsigned int strnm){
 	}
 	global_str = VIDEO_LENGTH - 1;
 	strnm = VIDEO_LENGTH - 1;
-	cursor_moveto(global_str, global_pos);
+	cursor_move_to(global_str, global_pos);
 }
-
-void ChooseColour(){
-	clean(0);
-	int defColour = 0x08;
-	global_pos = 1;
-	global_str = 0;
-	out_str(currentColour, "Choose colour:", global_str);
-	global_pos = 1;
-	out_str((currentColour == 0x07) ? 0x07 : defColour, (currentColour == 0x07) ? "  Gray" : "Gray", ++global_str);
-	global_pos = 1;
-	out_str((currentColour == 0x0f) ? 0x0f : defColour, (currentColour == 0x0f) ? "  White" : "White", ++global_str);
-	global_pos = 1;
-	out_str((currentColour == 0x0e) ? 0x0e : defColour, (currentColour == 0x0e) ? "  Yellow" : "Yellow", ++global_str);
-	global_pos = 1;
-	out_str((currentColour == 0x0b) ? 0x0b : defColour, (currentColour == 0x0b) ? "  Cian" : "Cian", ++global_str);
-	global_pos = 1;
-	out_str((currentColour == 0x09) ? 0x09 : defColour, (currentColour == 0x09) ? "  Magenta" : "Magenta", ++global_str);
-	global_pos = 1;
-	out_str((currentColour == 0x0a) ? 0x0a : defColour, (currentColour == 0x0a) ? "  Green" : "Green", ++global_str);
-	cursor_moveto(VIDEO_WIDTH, VIDEO_LENGTH);
-}
-
 
 extern "C" int kmain()
 {
-	start = true;
-	ChooseColour();
+	currentColour = colours[(*(unsigned char*)COLOUR_ADDRESS) - 1];
+	clean();
 
 	intr_disable();
 	intr_init();
@@ -195,6 +172,7 @@ void default_intr_handler()
 {
 	asm("pusha");
 	// ... (реализация обработки)
+	out_str(0x0c, "Wrong command", ++global_str);
 	asm("popa; leave; iret");
 }
 
@@ -290,7 +268,7 @@ void keyb_process_keys()
 }
 
 
-void cursor_moveto(unsigned int strnum, unsigned int pos)
+void cursor_move_to(unsigned int strnum, unsigned int pos)
 {
 	unsigned short new_pos = (strnum * VIDEO_WIDTH) + pos;
 	outb(CURSOR_PORT, 0x0F);
@@ -341,7 +319,7 @@ void out_char(int color, unsigned char simbol)
 	video_buf += 2*(global_str * VIDEO_WIDTH + global_pos);
 	video_buf[0] = simbol;
 	video_buf[1] = color;
-	cursor_moveto(global_str, ++global_pos);
+	cursor_move_to(global_str, ++global_pos);
 }
 
 void shift_check(unsigned char scan_code)
@@ -352,26 +330,6 @@ void shift_check(unsigned char scan_code)
 
 void on_key(unsigned char scan_code)
 {
-	if (start){
-		if (scan_code == 80) {
-			colour++;
-			if (colour == 6) colour = 0;
-			currentColour = colours[colour];
-			ChooseColour();
-		}
-		if (scan_code == 72) {
-			colour--;
-			if (colour == -1) colour = 5;
-			currentColour = colours[colour];
-			ChooseColour();
-		}
-	}
-	if (start && scan_code != 72 && scan_code != 80) 
-	{
-		start = false;
-		clean(1);
-		return;			
-	}
 	if (scan_code == 14) backspace();
 	else if (scan_code == 15) tab();
 	else if (scan_code == 28) enter();
@@ -387,7 +345,7 @@ void backspace()
 		unsigned char* video_buf = (unsigned char*) VIDEO_BUF_PTR;
 		video_buf += 2*(global_str*VIDEO_WIDTH + global_pos - 1);
 		video_buf[0] = '\0';
-		cursor_moveto(global_str, --global_pos);
+		cursor_move_to(global_str, --global_pos);
 	}
 }
 
@@ -397,17 +355,17 @@ void tab()
 	if (global_pos < 38)
 	{
 		global_pos += 4;
-		cursor_moveto(global_str, global_pos);	
+		cursor_move_to(global_str, global_pos);	
 	}
 }
 
 
 void enter()
 {
-	command_handler();
+	commands();
 	out_str(currentColour, "# ", ++global_str);
 	global_pos = 2;
-	cursor_moveto(global_str, global_pos);
+	cursor_move_to(global_str, global_pos);
 }
 
 
@@ -426,7 +384,7 @@ void symbol(unsigned char scan_code)
 }
 
 
-void command_handler()
+void commands()
 {
 	unsigned char* video_buf = (unsigned char*) VIDEO_BUF_PTR;
 	video_buf += 2 * (global_str * VIDEO_WIDTH + 2);
@@ -452,7 +410,9 @@ bool strcmp(unsigned char *str1, const char *str2)
    return false;
 }
 
-int strlen_s(unsigned char *str)
+
+
+int strlen(unsigned char *str)
 {
 	int i = 0;
 	while(*str != '\0') { str++; i++;}
@@ -468,19 +428,19 @@ void info()
 	out_str(currentColour, "OS: Linux", ++global_str);
 	switch(currentColour)
 	{
-		case 0x08: { out_str(currentColour, "Colour: gray", ++global_str); break; }
+		case 0x07: { out_str(currentColour, "Colour: gray", ++global_str); break; }
 		case 0x0f: { out_str(currentColour, "Colour: white", ++global_str); break; }
 		case 0x0e: { out_str(currentColour, "Colour: yellow", ++global_str); break; }
 		case 0x0b: { out_str(currentColour, "Colour: cian", ++global_str); break; }
 		case 0x09: { out_str(currentColour, "Colour: magenta", ++global_str); break; }
-		case 0x07: { out_str(currentColour, "Colour: green", ++global_str); break; }
+		case 0x0a: { out_str(currentColour, "Colour: green", ++global_str); break; }
 	}
 	out_str(currentColour, "Made by Sokolova Alexandra, gr. 4851001/00001", ++global_str);
 }
 
 int char_to_int(unsigned char *str){
 	int res = 0;
-	int sz = strlen_s(str);
+	int sz = strlen(str);
 	if (str[0]=='-'){
 		if (sz == 1) res = 1;
 		for (int i = 1; i < sz; i ++){
@@ -504,8 +464,8 @@ int char_to_int(unsigned char *str){
 }
 
 char *int_to_char(int integer){
-	int add = 1;
-	static char ch[40] = {'\0'};
+	bool add = 1;
+	static char ch[20] = {'\0'};
 
 	if (integer < 0) {
 		integer = 0 - integer;
@@ -531,10 +491,19 @@ char *int_to_char(int integer){
 	return ch;
 }
 
+bool check_of(int num, unsigned char* str_num){
+	return strcmp(str_num, int_to_char(num));
+}
+
+bool check_of_sum(int num1, int num2){
+	if (num1 >= 0 && num2 >= 0) return (num1 > MAX_INT - num2);
+	else return (num1 < MIN_INT - num2);
+}
+
 void solve(unsigned char *str){
 	int i = 0, j = 0;
-	unsigned char num1[40], num2[40], num3[40];
-	for (int k = 0; k < 40; k++){
+	unsigned char num1[20], num2[20], num3[20];
+	for (int k = 0; k < 20; k++){
 		num1[k] = '\0';
 		num2[k] = '\0';
 		num3[k] = '\0';
@@ -558,11 +527,11 @@ void solve(unsigned char *str){
 	}
 	int dig1 = 1;
 	dig1 = char_to_int(num1);
-	if (dig1 != 0 && (*num2 != '\0' || *num3 != '\0')){
-		int dig2 = 0;
-		if (*num2 != '\0') dig2 = char_to_int(num2);
-		int dig3 = 0;
-		if (*num3 != '\0') dig3 = char_to_int(num3);
+	int dig2 = 0;
+	if (*num2 != '\0') dig2 = char_to_int(num2);
+	int dig3 = 0;
+	if (*num3 != '\0') dig3 = char_to_int(num3);
+	if (dig1 != 0 && (dig2 != 0 || dig3 != 0) && check_of(dig1, num1) && check_of(dig3, num3) && check_of(dig2, num2) && check_of_sum(dig3, -1 * dig2)){
 		int res = (dig3 - dig2) /dig1;
 		if (dig1 * res + dig2 != dig3){
 			float resfl = ((float)dig3 - (float)dig2) / (float)dig1;
@@ -578,7 +547,7 @@ void solve(unsigned char *str){
 			if ((int)resfl % 10 >= 5) resfl = resfl + 10;
 			resfl = resfl / 10;
 			const char *chr2 = int_to_char((int)resfl);
-			for (int k = 5; k > strlen_s((unsigned char *)chr2); k--)
+			for (int k = 5; k > strlen((unsigned char *)chr2); k--)
 				out_word(currentColour, "0");
 			out_word(currentColour, chr2);
 		}
@@ -590,7 +559,11 @@ void solve(unsigned char *str){
 		out_word(currentColour, chr);
 		}
 	}
-	else out_str(0x0c, "Wrong command", ++global_str);
+	else {
+		if (dig2 == 0 && dig3 == 0) out_str(0x0c, "Wrong command", ++global_str);
+		if (dig1 == 0) out_str(0x0c, "Division by zero", ++global_str);
+		if (!check_of(dig1, num1) || !check_of(dig3, num3) || !check_of(dig2, num2) || !check_of_sum(dig3, -1 * dig2)) out_str(0x0c, "Overflow", ++global_str);
+	}
 }
 
 int nod(int m, int n)
@@ -600,8 +573,8 @@ int nod(int m, int n)
 
 void gcd(unsigned char *str){
 	int i = 0, j = 0;
-	unsigned char gcd1[40], gcd2[40];
-	for (int k = 0; k < 40; k++){
+	unsigned char gcd1[20], gcd2[20];
+	for (int k = 0; k < 20; k++){
 		gcd1[k] = '\0';
 		gcd2[k] = '\0';
 	}
@@ -615,11 +588,11 @@ void gcd(unsigned char *str){
 		i++;
 		j++;
 	}
-	if (*gcd1 != '\0' && *gcd2 != '\0' && *gcd1 != '0' && *gcd2 != '0'){
-		int dig1 = 1;
-		dig1 = char_to_int(gcd1);
-		int dig2 = 1;
-		dig2 = char_to_int(gcd2);
+	int dig1 = 1;
+	dig1 = char_to_int(gcd1);
+	int dig2 = 1;
+	dig2 = char_to_int(gcd2);
+	if (*gcd1 != '\0' && *gcd2 != '\0' && dig1 != 0 && dig2 != 0 && check_of(dig1, gcd1) && check_of(dig2, gcd2)){
 		int gcd_res = nod(dig1, dig2);
 		const char *chr = int_to_char(gcd_res);
 		global_pos = 0;
@@ -627,13 +600,16 @@ void gcd(unsigned char *str){
 		out_word(currentColour, "Result: ");
 		out_word(currentColour, chr);
 	}
-	else out_str(0x0c, "Wrong command", ++global_str);
+	else {
+		if (*gcd1 == '\0' || *gcd2 == '\0' || dig1 == 0 || dig2 == 0) out_str(0x0c, "Wrong command", ++global_str);
+		if (!check_of(dig1, gcd1) || !check_of(dig2, gcd2)) out_str(0x0c, "Overflow", ++global_str);
+	}
 }
 
 void lcm(unsigned char *str){
 	int i = 0, j = 0;
-	unsigned char lcm1[40], lcm2[40];
-	for (int k = 0; k < 40; k++){
+	unsigned char lcm1[20], lcm2[20];
+	for (int k = 0; k < 20; k++){
 		lcm1[k] = '\0';
 		lcm2[k] = '\0';
 	}
@@ -647,11 +623,12 @@ void lcm(unsigned char *str){
 		i++;
 		j++;
 	}
-	if (*lcm1 != '\0' && *lcm2 != '\0' && *lcm1 != '0' && *lcm2 != '0'){
-		int dig1 = 1;
-		dig1 = char_to_int(lcm1);
-		int dig2 = 1;
-		dig2 = char_to_int(lcm2);
+	int dig1 = 1;
+	dig1 = char_to_int(lcm1);
+	int dig2 = 1;
+	dig2 = char_to_int(lcm2);
+	if (*lcm1 != '\0' && *lcm2 != '\0' && dig1 != 0 && dig2 != 0 && check_of(dig1, lcm1) && check_of(dig2, lcm2)){
+		
 		int lcm_res = (dig1 * dig2) / nod(dig1, dig2);
 		const char *chr = int_to_char(lcm_res);
 		global_pos = 0;
@@ -659,13 +636,16 @@ void lcm(unsigned char *str){
 		out_word(currentColour, "Result: ");
 		out_word(currentColour, chr);
 	}
-	else out_str(0x0c, "Wrong command", ++global_str);
+	else {
+		if  (*lcm1 == '\0' || *lcm2 == '\0' || dig1 == 0 || dig2 == 0) out_str(0x0c, "Wrong command", ++global_str);
+		if (!check_of(dig1,lcm1) || !check_of(dig2, lcm2)) out_str(0x0c, "Overflow", ++global_str);
+	}
 }
 
 void div(unsigned char *str){
 	int i = 0, j = 0;
-	unsigned char div1[40], div2[40];
-	for (int k = 0; k < 40; k++){
+	unsigned char div1[20], div2[20];
+	for (int k = 0; k < 20; k++){
 		div1[k] = '\0';
 		div2[k] = '\0';
 	}
@@ -679,25 +659,29 @@ void div(unsigned char *str){
 		i++;
 		j++;
 	}
-	if (*div1 != '\0' && *div2 != '\0' && *div1 != '0' && *div2 != '0'){
-		int dig1 = 1;
-		dig1 = char_to_int(div1);
-		int dig2 = 1;
-		dig2 = char_to_int(div2);
-		float div_resfl = (float)dig1 / (float)dig2;
-		const char *chr1 = int_to_char((int)div_resfl);
-		global_pos = 0;
-		global_str++;
-		out_word(currentColour, "Result: ");
-		out_word(currentColour, chr1);
-		out_word(currentColour, ".");
-		div_resfl = (div_resfl - (int)div_resfl)*1000000;
-		if ((int)div_resfl % 10 >= 5) div_resfl = div_resfl + 10;
-		div_resfl = div_resfl / 10;
-		const char *chr2 = int_to_char((int)div_resfl);
-		for (int k = 5; k > strlen_s((unsigned char *)chr2); k--)
-			out_word(currentColour, "0");
+	int dig1 = 1;
+	dig1 = char_to_int(div1);
+	int dig2 = 1;
+	dig2 = char_to_int(div2);
+	if (*div1 != '\0' && *div2 != '\0' && dig1 != 0 && check_of(dig1, div1) && check_of(dig2, div2)){
+	float div_resfl = (float)dig1 / (float)dig2;
+	const char *chr1 = int_to_char((int)div_resfl);
+	global_pos = 0;
+	global_str++;
+	out_word(currentColour, "Result: ");
+	out_word(currentColour, chr1);
+	out_word(currentColour, ".");
+	div_resfl = (div_resfl - (int)div_resfl)*1000000;
+	if ((int)div_resfl % 10 >= 5) div_resfl = div_resfl + 10;
+	div_resfl = div_resfl / 10;
+	const char *chr2 = int_to_char((int)div_resfl);
+	for (int k = 5; k > strlen((unsigned char *)chr2); k--)
+		out_word(currentColour, "0");
 		out_word(currentColour, chr2);
 	}
-	else out_str(0x0c, "Wrong command", ++global_str);
+	else {
+		if (*div1 == '\0' || *div2 == '\0') out_str(0x0c, "Wrong command", ++global_str);
+		if (dig1 == 0) out_str(0x0c, "Division by zero", ++global_str);
+		if (!check_of(dig1, div1) || !check_of(dig2, div2)) out_str(0x0c, "Overflow", ++global_str);
+	}
 }
