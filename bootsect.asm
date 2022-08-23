@@ -116,7 +116,7 @@ kernel:
 	movw $0x1000, %ax #addres of kernel
 	movw %ax, %es
 	movw $0x0000, %bx
-	movb $0x25, %al #сколько секторов считать
+	movb $0x26, %al #сколько секторов считать
 	movb $0x01, %cl #номер сегмента
 	movb $0x00, %ch #номер цилиндра
 	movb $0x00, %dh #номер головки

@@ -35,6 +35,7 @@ typedef void (*intr_handler)();
 
 struct idt_entry g_idt[256];
 struct idt_ptr g_idtp;
+	
 unsigned int global_str = 0;
 unsigned int global_pos = 0;
 bool shift = false;
@@ -82,8 +83,7 @@ void keyb_handler();
 void keyb_process_keys();
 void cursor_move_to(unsigned int strnum, unsigned int pos);
 
-char scan_codes[] = 
-{
+char scan_codes[] = {
     0, 
     0,
     '1','2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=',
@@ -111,21 +111,17 @@ char scan_codes[] =
     0,
     '+',
     0,
-    0
-};
+    0 };
 
 
-char shift_char[] = 
-{
+char shift_char[] = {
 	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '=', '8',
-	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '+', '*'
-};
+	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '+', '*' };
 
 char currentColour = 0x08;
 char colours[] = { 0x07, 0x0f, 0x0e, 0x0b, 0x09, 0x0a };
 
-void clean()
-{	
+void clean(){	
 	unsigned char *video_buf = (unsigned char*) VIDEO_BUF_PTR;
 	for (int i = 0; i < VIDEO_WIDTH * VIDEO_LENGTH; i++){
 		*(video_buf + i*2) = '\0';
@@ -151,8 +147,7 @@ void scroll(unsigned int strnm){
 	cursor_move_to(global_str, global_pos);
 }
 
-extern "C" int kmain()
-{
+extern "C" int kmain(){
 	currentColour = colours[(*(unsigned char*)COLOUR_ADDRESS) - 1];
 	clean();
 
@@ -169,18 +164,7 @@ extern "C" int kmain()
 	return 0;
 }
 
-// Пустой обработчик прерываний. Другие обработчики могут быть реализованы по этому шаблону
-void default_intr_handler()
-{
-	asm("pusha");
-	// ... (реализация обработки)
-	out_str(ERR_CLR, "Wrong command", ++global_str);
-	asm("popa; leave; iret");
-}
-
-
-void intr_reg_handler(int num, unsigned short segm_sel, unsigned short flags, intr_handler hndlr)
-{
+void intr_reg_handler(int num, unsigned short segm_sel, unsigned short flags, intr_handler hndlr){
 	unsigned int hndlr_addr = (unsigned int) hndlr;
 
 	g_idt[num].base_lo = (unsigned short) (hndlr_addr & 0xFFFF);
@@ -190,9 +174,13 @@ void intr_reg_handler(int num, unsigned short segm_sel, unsigned short flags, in
 	g_idt[num].base_hi = (unsigned short) (hndlr_addr >> 16);
 }
 
+void default_intr_handler(){
+	asm("pusha");
+	// ... (реализация обработки)
+	asm("popa; leave; iret");
+}
 
-void intr_init()
-{
+void intr_init(){
 	int i;
 	int idt_count = sizeof(g_idt) / sizeof(g_idt[0]);
 
@@ -202,8 +190,7 @@ void intr_init()
 }
 
 
-void intr_start()
-{
+void intr_start(){
 	int idt_count = sizeof(g_idt) / sizeof(g_idt[0]);
 
 	g_idtp.base = (unsigned int) (&g_idt[0]);
@@ -212,54 +199,44 @@ void intr_start()
 	asm("lidt %0" : : "m" (g_idtp) );
 }
 
-void intr_enable()
-{
+void intr_enable(){
 	asm("sti");
 }
 
-void intr_disable()
-{
+void intr_disable(){
 	asm("cli");
 }
 
 
-static inline unsigned char inb (unsigned short port) 
-{
+static inline unsigned char inb (unsigned short port) {
 	unsigned char data;
 	asm volatile ("inb %w1, %b0" : "=a" (data) : "Nd" (port));
 	return data;
 }
 
 
-static inline void outb (unsigned short port, unsigned char data)
-{
+static inline void outb (unsigned short port, unsigned char data){
 	asm volatile ("outb %b0, %w1" : : "a" (data), "Nd" (port));
 }
 
-static inline void outw (unsigned int port, unsigned int data)
-{
+static inline void outw (unsigned int port, unsigned int data){
 	asm volatile ("outw %w0, %w1" : : "a" (data), "Nd" (port));
 }
 
-void keyb_init()
-{
+void keyb_init(){
 	intr_reg_handler(0x09, GDT_CS, 0x80 | IDT_TYPE_INTR, keyb_handler);
 	outb(PIC1_PORT + 1, 0xFF ^ 0x02);
 }
 
-void keyb_handler()
-{
+void keyb_handler(){
 	asm("pusha");
 	keyb_process_keys();
 	outb(PIC1_PORT, 0x20);
 	asm("popa; leave; iret");
 }
 
-
-void keyb_process_keys()
-{
-	if (inb(0x64) & 0x01)
-	{
+void keyb_process_keys(){
+	if (inb(0x64) & 0x01){
 		unsigned char scan_code;
 		unsigned char state;
 		scan_code = inb(0x60);
@@ -279,8 +256,7 @@ void cursor_move_to(unsigned int strnum, unsigned int pos)
 	outb(CURSOR_PORT + 1, (unsigned char)( (new_pos >> 8) & 0xFF));
 }
 
-void out_str(int color, const char* ptr, unsigned int strnum)
-{
+void out_str(int color, const char* ptr, unsigned int strnum){
 	if (strnum >= VIDEO_LENGTH){
 		char nm = VIDEO_LENGTH - strnum + 1;
 		for (int i = 0; i < nm; i++) scroll(strnum);
@@ -288,8 +264,7 @@ void out_str(int color, const char* ptr, unsigned int strnum)
 	}
 	unsigned char* video_buf = (unsigned char*) VIDEO_BUF_PTR;
 	video_buf += VIDEO_WIDTH * 2 * strnum;
-	while (*ptr)
-	{
+	while (*ptr){
 		video_buf[0] = (unsigned char) *ptr;
 		video_buf[1] = color;
 		video_buf += 2;
@@ -297,16 +272,14 @@ void out_str(int color, const char* ptr, unsigned int strnum)
 	}
 }
 
-void out_word(int color, const char* ptr)
-{
+void out_word(int color, const char* ptr){
 	if (global_str >= VIDEO_LENGTH){
 		char nm = VIDEO_LENGTH - global_str + 1;
 		for (int i = 0; i < nm; i++) scroll(global_str);
 	}
 	unsigned char* video_buf = (unsigned char*) VIDEO_BUF_PTR;
 	video_buf += 2*(VIDEO_WIDTH * global_str + global_pos);
-	while (*ptr)
-	{
+	while (*ptr){
 		video_buf[0] = (unsigned char) *ptr;
 		video_buf[1] = color;
 		video_buf += 2;
@@ -315,8 +288,7 @@ void out_word(int color, const char* ptr)
 	}
 }
 
-void out_char(int color, unsigned char simbol)
-{
+void out_char(int color, unsigned char simbol){
 	unsigned char* video_buf = (unsigned char*) VIDEO_BUF_PTR;
 	video_buf += 2*(global_str * VIDEO_WIDTH + global_pos);
 	video_buf[0] = simbol;
@@ -324,14 +296,12 @@ void out_char(int color, unsigned char simbol)
 	cursor_move_to(global_str, ++global_pos);
 }
 
-void shift_check(unsigned char scan_code)
-{
+void shift_check(unsigned char scan_code){
 	if (scan_code == 170 || scan_code == 182)
 		shift = false;
 }
 
-void on_key(unsigned char scan_code)
-{
+void on_key(unsigned char scan_code){
 	if (scan_code == 14) backspace();
 	else if (scan_code == 15) tab();
 	else if (scan_code == 28) enter();
@@ -341,8 +311,7 @@ void on_key(unsigned char scan_code)
 }
 
 
-void backspace()
-{
+void backspace(){
 	if (global_pos > 2){
 		unsigned char* video_buf = (unsigned char*) VIDEO_BUF_PTR;
 		video_buf += 2*(global_str*VIDEO_WIDTH + global_pos - 1);
@@ -352,8 +321,7 @@ void backspace()
 }
 
 
-void tab()
-{
+void tab(){
 	if (global_pos < 38)
 	{
 		global_pos += 4;
@@ -362,8 +330,7 @@ void tab()
 }
 
 
-void enter()
-{
+void enter(){
 	commands();
 	out_str(currentColour, "# ", ++global_str);
 	global_pos = 2;
@@ -371,8 +338,7 @@ void enter()
 }
 
 
-void symbol(unsigned char scan_code)
-{
+void symbol(unsigned char scan_code){
 	char c = scan_codes[(unsigned int)scan_code];
 	if (shift == false) out_char(currentColour, c);
 	else
@@ -386,15 +352,15 @@ void symbol(unsigned char scan_code)
 }
 
 unsigned char* lower(unsigned char* str){
-	for (int i = 0; i < strlen(str); i+=2)
+	unsigned char* temp = str;
+	for (int i = 0; i < strlen(temp); i+=2)
 		for (int j = 0; j < 28 * 2; j++)
-			if (str[i] == shift_char[j]) str[i] = shift_char[j % 28];
-	return str;
+			if (j % 28 != 26 && j % 28 != 27 && str[i] == shift_char[j]) temp[i] = shift_char[j % 28];
+	return temp;
 }
 
 
-void commands()
-{
+void commands(){
 	unsigned char* video_buf = (unsigned char*) VIDEO_BUF_PTR;
 	video_buf += 2 * (global_str * VIDEO_WIDTH + 2);
 
@@ -407,10 +373,8 @@ void commands()
 	else out_str(ERR_CLR, "Wrong command", ++global_str);
 }
 
-bool strcmp(unsigned char *str1, const char *str2)
-{
-    while (*str1 != '\0' && *str1 != ' ' && *str2 != '\0' && *str1 == *str2) 
-    {
+bool strcmp(unsigned char *str1, const char *str2){
+    while (*str1 != '\0' && *str1 != ' ' && *str2 != '\0' && *str1 == *str2){
       str1+=2;
       str2++;
     }
@@ -421,22 +385,19 @@ bool strcmp(unsigned char *str1, const char *str2)
 
 
 
-int strlen(unsigned char *str)
-{
+int strlen(unsigned char *str){
 	int i = 0;
 	while(*str != '\0') { str++; i++;}
 	return i;
 }
 
 
-void info()
-{
+void info(){
 	global_pos = 0;
 	out_str(currentColour, "SolverOS", ++global_str);
 	out_str(currentColour, "YASM (AT&T)", ++global_str);
 	out_str(currentColour, "OS: Linux", ++global_str);
-	switch(currentColour)
-	{
+	switch(currentColour) {
 		case 0x07: { out_str(currentColour, "Colour: gray", ++global_str); break; }
 		case 0x0f: { out_str(currentColour, "Colour: white", ++global_str); break; }
 		case 0x0e: { out_str(currentColour, "Colour: yellow", ++global_str); break; }
@@ -473,30 +434,30 @@ int char_to_int(unsigned char *str){
 }
 
 unsigned char *int_to_char(int integer){
-	bool add = 1;
-	unsigned char ch[20] = {'\0'};
+	bool add = 0;
+	unsigned char *ch;
+	for (int l = 0; l < 11; l++) ch[l] = '\0';
 
 	if (integer < 0) {
 		integer = 0 - integer;
-		add = 0;
+		add = 1;
 	}
 
 	if (!integer) return (unsigned char*)"0";
 
-	int i = 0;
+	int i = -1;
 	int temp = integer;
 	while (temp) {
 		i++;
 		temp /= 10;
 	}
-	if (!add) i++;
-	ch[i--] = '\0';
+	if (add) i++;
 
 	while (i >= 0) {
 		ch[i--] = (integer % 10) + '0';
 		integer /= 10;
 	}
-	if (!add) ch[0] = '-';
+	if (add) ch[0] = '-';
 	return ch;
 }
 
@@ -512,12 +473,13 @@ bool strcmp_s(unsigned char* str1, unsigned char* str2){
 }
 
 bool check_of(int num, unsigned char* str_num){
-	if (strcmp_s(str_num, int_to_char(num))){
-		out_word(ERR_CLR, "0");
-		return 0;
-	}
-	out_word(ERR_CLR, "1");
-	return 1;
+	unsigned char *num_str;
+	for (int i = 0; i < 11; i++) num_str[i] = '\0';
+	num_str = int_to_char(num);
+	////////
+	out_str(ERR_CLR, (const char*)num_str, ++global_str);
+	////////
+	return !(strcmp_s(str_num, num_str));
 }
 
 bool check_of_sum(int num1, int num2){
@@ -551,11 +513,18 @@ void solve(unsigned char *str){
 		j++;
 	}
 	int dig1 = 1;
-	dig1 = char_to_int(num1);
+	if (*num1 != '\0') dig1 = char_to_int(num1);
+	else *num1 = '1';
+	if (dig1 == -1){
+		num1[0] = '-';
+		num1[1] = '1';
+	}
 	int dig2 = 0;
 	if (*num2 != '\0') dig2 = char_to_int(num2);
+	else *num2 = '0';
 	int dig3 = 0;
 	if (*num3 != '\0') dig3 = char_to_int(num3);
+	else *num3 = '0';
 	bool ZD = (dig1 == 0);
 	bool WC = (dig2 == 0 && dig3 == 0);
 	bool OF = (check_of(dig1, num1) || check_of(dig3, num3) || check_of(dig2, num2) || check_of_sum(dig3, -1 * dig2));
@@ -615,10 +584,12 @@ void gcd(unsigned char *str){
 		i++;
 		j++;
 	}
-	int dig1 = 1;
-	dig1 = char_to_int(gcd1);
-	int dig2 = 1;
-	dig2 = char_to_int(gcd2);
+	int dig1 = 0;
+	if (*gcd1 != '\0') dig1 = char_to_int(gcd1);
+	else *gcd1 = '0';
+	int dig2 = 0;
+	if (*gcd2 != '\0') dig2 = char_to_int(gcd2);
+	else *gcd2 = '0';
 	bool WC = (*gcd1 == '\0' || *gcd2 == '\0' || dig1 == 0 || dig2 == 0);
 	bool OF = (check_of(dig1, gcd1) || check_of(dig2, gcd2));
 	if (!WC && !OF){
@@ -652,10 +623,12 @@ void lcm(unsigned char *str){
 		i++;
 		j++;
 	}
-	int dig1 = 1;
-	dig1 = char_to_int(lcm1);
-	int dig2 = 1;
-	dig2 = char_to_int(lcm2);
+	int dig1 = 0;
+	if (*lcm1 != '\0') dig1 = char_to_int(lcm1);
+	else *lcm1 = '0';
+	int dig2 = 0;
+	if (*lcm2 != '\0') dig2 = char_to_int(lcm2);
+	else *lcm2 = '0';
 	bool WC = (*lcm1 == '\0' || *lcm2 == '\0' || dig1 == 0 || dig2 == 0);
 	bool OF = (check_of(dig1,lcm1) || check_of(dig2, lcm2));
 	if (!WC && !OF){
@@ -690,10 +663,12 @@ void div(unsigned char *str){
 		i++;
 		j++;
 	}
-	int dig1 = 1;
-	dig1 = char_to_int(div1);
-	int dig2 = 1;
-	dig2 = char_to_int(div2);
+	int dig1 = 0;
+	if (*div1 != '\0') dig1 = char_to_int(div1);
+	else *div1 = '0';
+	int dig2 = 0;
+	if (*div2 != '\0') dig2 = char_to_int(div2);
+	else *div2 = '0';
 	bool WC = (*div1 == '\0' || *div2 == '\0');
 	bool ZD = (dig2 == 0);
 	bool OF = (check_of(dig1, div1) || check_of(dig2, div2));
@@ -705,7 +680,7 @@ void div(unsigned char *str){
 		out_word(currentColour, "Result: ");
 		out_word(currentColour, (const char*)chr1);
 		out_word(currentColour, ".");
-		div_resfl = (div_resfl - (int)div_resfl)*1000000;
+		div_resfl = (div_resfl - (int)div_resfl) * 1000000;
 		if ((int)div_resfl % 10 >= 5) div_resfl = div_resfl + 10;
 		div_resfl = div_resfl / 10;
 		unsigned char *chr2 = int_to_char((int)div_resfl);
