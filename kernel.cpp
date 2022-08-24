@@ -354,8 +354,8 @@ void symbol(unsigned char scan_code){
 unsigned char* lower(unsigned char* str){
 	unsigned char* temp = str;
 	for (int i = 0; i < strlen(temp); i+=2)
-		for (int j = 0; j < 28 * 2; j++)
-			if (j % 28 != 26 && j % 28 != 27 && str[i] == shift_char[j]) temp[i] = shift_char[j % 28];
+		for (int j = 28; j < 54; j++)
+			if (str[i] == shift_char[j]) temp[i] = shift_char[j % 28];
 	return temp;
 }
 
@@ -462,8 +462,7 @@ unsigned char *int_to_char(int integer){
 }
 
 bool strcmp_s(unsigned char* str1, unsigned char* str2){
-	if (*str1 == '+') str1++;
-	while (*str1 != '\0' && *str1 != ' ' && *str2 != '\0' && *str1 == *str2) 
+	while (*str1 != '\0' && *str2 != '\0' && *str1 == *str2) 
     {
       str1++;
       str2++;
@@ -473,16 +472,15 @@ bool strcmp_s(unsigned char* str1, unsigned char* str2){
 }
 
 bool check_of(int num, unsigned char* str_num){
+	if (*str_num == '+') str_num++;
 	unsigned char *num_str;
 	for (int i = 0; i < 11; i++) num_str[i] = '\0';
 	num_str = int_to_char(num);
-	////////
-	out_str(ERR_CLR, (const char*)num_str, ++global_str);
-	////////
 	return !(strcmp_s(str_num, num_str));
 }
 
 bool check_of_sum(int num1, int num2){
+	out_str(ERR_CLR, "1", ++global_str);
 	if (num1 >= 0 && num2 >= 0) return (num1 > MAX_INT - num2);
 	else return (num1 < MIN_INT - num2);
 }
@@ -515,6 +513,7 @@ void solve(unsigned char *str){
 	int dig1 = 1;
 	if (*num1 != '\0') dig1 = char_to_int(num1);
 	else *num1 = '1';
+	if (dig1 == 1) *num1 = '1';
 	if (dig1 == -1){
 		num1[0] = '-';
 		num1[1] = '1';
@@ -678,9 +677,11 @@ void div(unsigned char *str){
 		global_pos = 0;
 		global_str++;
 		out_word(currentColour, "Result: ");
+		if (div_resfl < 0 && div_resfl > -1) out_word(currentColour, "-");
 		out_word(currentColour, (const char*)chr1);
 		out_word(currentColour, ".");
 		div_resfl = (div_resfl - (int)div_resfl) * 1000000;
+		if (div_resfl < 0) div_resfl = div_resfl * (-1);
 		if ((int)div_resfl % 10 >= 5) div_resfl = div_resfl + 10;
 		div_resfl = div_resfl / 10;
 		unsigned char *chr2 = int_to_char((int)div_resfl);
