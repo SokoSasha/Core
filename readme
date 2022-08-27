@@ -1,3 +1,5 @@
+Команды:
+
 yasm -p gas -f bin -o bootsect.tmp bootsect.asm
 dd bs=31744 skip=1 if=bootsect.tmp of=bootsect.bin
 
