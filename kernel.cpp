@@ -480,7 +480,6 @@ bool check_of(int num, unsigned char* str_num){
 }
 
 bool check_of_sum(int num1, int num2){
-	out_str(ERR_CLR, "1", ++global_str);
 	if (num1 >= 0 && num2 >= 0) return (num1 > MAX_INT - num2);
 	else return (num1 < MIN_INT - num2);
 }
@@ -512,8 +511,7 @@ void solve(unsigned char *str){
 	}
 	int dig1 = 1;
 	if (*num1 != '\0') dig1 = char_to_int(num1);
-	else *num1 = '1';
-	if (dig1 == 1) *num1 = '1';
+	if (dig1 == 1)  num1[0] = '1';
 	if (dig1 == -1){
 		num1[0] = '-';
 		num1[1] = '1';
@@ -662,13 +660,15 @@ void div(unsigned char *str){
 		i++;
 		j++;
 	}
+	bool WC = (*div1 == '\0' || *div2 == '\0');
 	int dig1 = 0;
 	if (*div1 != '\0') dig1 = char_to_int(div1);
 	else *div1 = '0';
+	out_str(ERR_CLR, (const char*)div1, ++global_str);
 	int dig2 = 0;
 	if (*div2 != '\0') dig2 = char_to_int(div2);
 	else *div2 = '0';
-	bool WC = (*div1 == '\0' || *div2 == '\0');
+	out_str(ERR_CLR, (const char*)div2, ++global_str);
 	bool ZD = (dig2 == 0);
 	bool OF = (check_of(dig1, div1) || check_of(dig2, div2));
 	if (!WC && !ZD && !OF){
