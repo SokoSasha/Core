@@ -303,7 +303,6 @@ void shift_check(unsigned char scan_code){
 
 void on_key(unsigned char scan_code){
 	if (scan_code == 14) backspace();
-	else if (scan_code == 15) tab();
 	else if (scan_code == 28) enter();
 	else if (scan_code == 42 || scan_code == 54)
 		shift = true;
@@ -319,16 +318,6 @@ void backspace(){
 		cursor_move_to(global_str, --global_pos);
 	}
 }
-
-
-void tab(){
-	if (global_pos < 38)
-	{
-		global_pos += 4;
-		cursor_move_to(global_str, global_pos);	
-	}
-}
-
 
 void enter(){
 	commands();
