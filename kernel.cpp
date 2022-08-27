@@ -481,7 +481,8 @@ bool check_of(int num, unsigned char* str_num){
 
 bool check_of_sum(int num1, int num2){
 	if (num1 >= 0 && num2 >= 0) return (num1 > MAX_INT - num2);
-	else return (num1 < MIN_INT - num2);
+	if (num1 < 0 && num2 < 0) return (num1 < MIN_INT - num2);
+	return 0;
 }
 
 void solve(unsigned char *str){
@@ -522,17 +523,18 @@ void solve(unsigned char *str){
 	int dig3 = 0;
 	if (*num3 != '\0') dig3 = char_to_int(num3);
 	else *num3 = '0';
+	out_word(ERR_CLR, " ");
 	bool ZD = (dig1 == 0);
 	bool WC = (dig2 == 0 && dig3 == 0);
-	bool OF = (check_of(dig1, num1) || check_of(dig3, num3) || check_of(dig2, num2) || check_of_sum(dig3, -1 * dig2));
+	bool OF = (check_of(dig1, num1) || check_of(dig3, num3) || check_of(dig2, num2) || check_of_sum(dig3, -dig2));
 	if (!ZD && !WC && !OF){
 		int res = (dig3 - dig2) /dig1;
+		global_pos = 0;
+		global_str++;
+		out_word(currentColour, "Result: x = ");
 		if (dig1 * res + dig2 != dig3){
 			float resfl = ((float)dig3 - (float)dig2) / (float)dig1;
 			unsigned char *chr1 = int_to_char((int)resfl);
-			global_pos = 0;
-			global_str++;
-			out_word(currentColour, "Result: x = ");
 			if (resfl < 0 && resfl > -1) out_word(currentColour, "-");
 			out_word(currentColour, (const char*)chr1);
 			out_word(currentColour, ".");
@@ -547,9 +549,6 @@ void solve(unsigned char *str){
 		}
 		else {
 		unsigned char *chr = int_to_char(res);
-		global_pos = 0;
-		global_str++;
-		out_word(currentColour, "Result: x = ");
 		out_word(currentColour, (const char*)chr);
 		}
 	}
@@ -587,6 +586,7 @@ void gcd(unsigned char *str){
 	int dig2 = 0;
 	if (*gcd2 != '\0') dig2 = char_to_int(gcd2);
 	else *gcd2 = '0';
+	out_word(ERR_CLR, " ");
 	bool WC = (*gcd1 == '\0' || *gcd2 == '\0' || dig1 == 0 || dig2 == 0);
 	bool OF = (check_of(dig1, gcd1) || check_of(dig2, gcd2));
 	if (!WC && !OF){
@@ -626,6 +626,7 @@ void lcm(unsigned char *str){
 	int dig2 = 0;
 	if (*lcm2 != '\0') dig2 = char_to_int(lcm2);
 	else *lcm2 = '0';
+	out_word(ERR_CLR, " ");
 	bool WC = (*lcm1 == '\0' || *lcm2 == '\0' || dig1 == 0 || dig2 == 0);
 	bool OF = (check_of(dig1,lcm1) || check_of(dig2, lcm2));
 	if (!WC && !OF){
@@ -664,12 +665,11 @@ void div(unsigned char *str){
 	int dig1 = 0;
 	if (*div1 != '\0') dig1 = char_to_int(div1);
 	else *div1 = '0';
-	out_str(ERR_CLR, (const char*)div1, ++global_str);
 	int dig2 = 0;
 	if (*div2 != '\0') dig2 = char_to_int(div2);
 	else *div2 = '0';
-	out_str(ERR_CLR, (const char*)div2, ++global_str);
-	bool ZD = (dig2 == 0);
+	out_word(ERR_CLR, " ");
+	bool ZD = (dig2 == 0 && !WC);
 	bool OF = (check_of(dig1, div1) || check_of(dig2, div2));
 	if (!WC && !ZD && !OF){
 		float div_resfl = (float)dig1 / (float)dig2;
